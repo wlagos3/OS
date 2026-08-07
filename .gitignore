@@ -1,0 +1,11 @@
+# build output
+build/
+cmake-build-*/
+
+# CLion / JetBrains
+.idea/
+
+# macOS
+.DS_Store
+
+.claude/
