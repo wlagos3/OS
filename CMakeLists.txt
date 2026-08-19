@@ -21,12 +21,28 @@ set(LINKER_SCRIPT ${CMAKE_SOURCE_DIR}/src/linker.ld)
 
 add_executable(kernel.elf
     src/boot.S
-        src/kernel.c
+    src/kernel.c
+    src/power.c
+    src/console.c
+    src/drivers/pl011.c
+    src/drivers/virtual/ramfb.c
+    src/drivers/virtual/fwcfg.c
+    src/lib/string.c
+        src/lib/printf.c
+        src/lib/printf.h
+        src/lib/mem.c
+        src/lib/mem.h
+        src/gfx.c
+        src/gfx.h
 )
+
+# lets any file include project headers rooted at src/, e.g. "lib/string.h"
+target_include_directories(kernel.elf PRIVATE src)
 
 target_compile_options(kernel.elf PRIVATE
     -ffreestanding
     -mgeneral-regs-only
+    -mstrict-align # MMU off = Device memory = unaligned accesses fault
     -Wall
     -Wextra
     -g

@@ -1,19 +1,22 @@
-#define UART0_BASE  0x09000000UL
-#define UARTDR (*(volatile unsigned int *)(UART0_BASE))
-#define UARTFR (*(volatile unsigned int *)(UART0_BASE + 0x18))
+#include "power.h"
+#include "drivers/virtual/ramfb.h"
+#include "lib/printf.h"
+#include "drivers/virtual/fwcfg.h"
+#include <stdint.h>
 
-// UART
-void send_uart_char(char c) {
-    while (UARTFR & (1 << 5)) {}
-    UARTDR = c;
-}
-void send_uart_string(const char *s) {
-    while (*s) {
-        send_uart_char(*s++);
-    }
-}
+#include "gfx.h"
 
 void kernel_main(void) {
-    send_uart_string("Hello Computer");
+    kprintf("Hello Computer\n");
+
+    fw_config_init();
+    uint16_t key; uint32_t size;
+    if (fw_fg_find_file("etc/ramfb", &key, &size) == 0)
+        kprintf("etc/ramfb: key %d size %d\n", key, size);
+    else
+        kprintf("etc/ramfb not found\n");
+
+    ramfb_init();
+    gfx_fill_rect(0, 0, 740, 480, 0x1010FF);
     for (;;);
 }
