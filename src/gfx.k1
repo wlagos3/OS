@@ -1,0 +1,23 @@
+
+
+let(extern("font8x16")) font-data: u8
+let(extern("ramfb_fb")) fb-start: u32
+
+
+fn fb(): *mut array[array[u32, 1920], 1080] {
+  (&fb-start).as[ptr].ref-at[array[array[u32, 1920], 1080]](0)
+}
+
+
+fn fill-rect(x: int, y: int, w: int, h: int, color: u32): empty {
+  let x0 = x; let y0 = y; let x1 = x + w; let y1 = y + h
+  x0 = max(x0, 0); y0 = max(y0, 0); x1 = min(x1, 1920); y1 = min(y1, 1080)
+
+  if x0 >= x1 or y0 >= y1 return
+
+  for row in y0.until(y1) {
+    for col in x0.until(x1) {
+      fb().[row].[col] = color
+    }
+  }
+}

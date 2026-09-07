@@ -22,6 +22,12 @@ proceed:
     str xzr, [x1], #8
     b 1b
 2:
+// enable the fpu
+    mrs x1, cpacr_el1
+    // don't trap FP or SIMD
+    orr x1, x1, #(0x3 << 20)
+    msr cpacr_el1, x1
+    isb
     bl kernel_main
     b core_hang
 

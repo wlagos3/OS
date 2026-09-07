@@ -9,3 +9,5 @@ cmake-build-*/
 .DS_Store
 
 .claude/
+out/
+.k1-out/

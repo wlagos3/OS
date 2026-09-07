@@ -23,29 +23,37 @@ set(LINKER_SCRIPT ${CMAKE_SOURCE_DIR}/src/linker.ld)
 # --- hello.k1 ----------------------------------------------------------------
 # k1 only emits host objects (Mach-O arm64 here), which ld.lld cannot link into
 # an ELF kernel. Take its LLVM IR instead and re-codegen it for aarch64-none-elf.
-set(K1_SRC ${CMAKE_SOURCE_DIR}/hello.k1)
-set(K1_LL  ${CMAKE_SOURCE_DIR}/.k1-out/hello.ll)
-set(K1_OBJ ${CMAKE_CURRENT_BINARY_DIR}/hello_k1.o)
+# Off by default; enable with:  cmake -B build -DWITH_K1=ON
+option(WITH_K1 "Build and link the hello.k1 sample" OFF)
 
-add_custom_command(
-    OUTPUT ${K1_LL}
-    COMMAND k1 --emit-llvm build ${K1_SRC}
-    DEPENDS ${K1_SRC}
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    COMMENT "k1 build hello.k1 -> hello.ll"
-    VERBATIM
-)
+set(K1_OBJS "")
+if(WITH_K1)
+    set(K1_SRC ${CMAKE_SOURCE_DIR}/hello.k1)
+    set(K1_LL  ${CMAKE_SOURCE_DIR}/.k1-out/hello.ll)
+    set(K1_OBJ ${CMAKE_CURRENT_BINARY_DIR}/hello_k1.o)
 
-add_custom_command(
-    OUTPUT ${K1_OBJ}
-    COMMAND ${CMAKE_C_COMPILER} --target=aarch64-none-elf -ffreestanding
-            -mgeneral-regs-only -Wno-override-module -c ${K1_LL} -o ${K1_OBJ}
-    DEPENDS ${K1_LL}
-    COMMENT "hello.ll -> aarch64-none-elf object"
-    VERBATIM
-)
+    add_custom_command(
+        OUTPUT ${K1_LL}
+        COMMAND k1 --emit-llvm build ${K1_SRC}
+        DEPENDS ${K1_SRC}
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        COMMENT "k1 build hello.k1 -> hello.ll"
+        VERBATIM
+    )
 
-set_source_files_properties(${K1_OBJ} PROPERTIES EXTERNAL_OBJECT TRUE GENERATED TRUE)
+    add_custom_command(
+        OUTPUT ${K1_OBJ}
+        COMMAND ${CMAKE_C_COMPILER} --target=aarch64-none-elf -ffreestanding
+                -mgeneral-regs-only -mstrict-align -Wno-override-module
+                -c ${K1_LL} -o ${K1_OBJ}
+        DEPENDS ${K1_LL}
+        COMMENT "hello.ll -> aarch64-none-elf object"
+        VERBATIM
+    )
+
+    set_source_files_properties(${K1_OBJ} PROPERTIES EXTERNAL_OBJECT TRUE GENERATED TRUE)
+    set(K1_OBJS ${K1_OBJ})
+endif()
 
 add_executable(kernel.elf
     src/boot.S
@@ -60,13 +68,15 @@ add_executable(kernel.elf
         src/lib/printf.h
         src/lib/mem.c
         src/lib/mem.h
-        src/gfx.c
-        src/gfx.h
-        ${K1_OBJ}
+        ${K1_OBJS}
 )
 
 # lets any file include project headers rooted at src/, e.g. "lib/string.h"
 target_include_directories(kernel.elf PRIVATE src)
+
+if(WITH_K1)
+    target_compile_definitions(kernel.elf PRIVATE WITH_K1)
+endif()
 
 target_compile_options(kernel.elf PRIVATE
     -ffreestanding
