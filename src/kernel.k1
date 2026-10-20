@@ -1,19 +1,20 @@
 fn(extern("console_putc")) console-putc(c: u8)
 fn(extern("console_init")) console-init()
 fn(extern("shutdown")) shutdown()
+fn(extern("mem_stats")) mem-stats()
 fn(extern("fw_config_init")) fw-config-init()
 fn(extern("ramfb_init")) ramfb-init()
 fn(extern("gfx_fill_rect")) gfx-fill-rect(x: i32, y: i32, w: i32, h: i32, color: u32)
 
-let(extern("_kernel_end")) kernel-end: u8
+let(mutable, extern("_kernel_end")) kernel-end: u8
 let(mutable) reserve-cursor: size = 0
 
 
 // k1 platform contract
 
-fn(export("k1_platform_mem_reserve")) mem-reserve(min-size: size): ptr {
+fn(export("os_platform_mem_reserve")) mem-reserve(min-size: size): ptr {
   if reserve-cursor == 0 {
-    reserve-cursor = (&kernel-end).as[ptr].aligned(4096).to-size()
+    reserve-cursor = kernel-end.&.as[ptr].aligned(4096).to-size()
     // round up to page size
     let rounded = (min-size + 4095) & 4095.bit-not()
     // this is a constant for now, gotta read the device tree eventually
@@ -26,8 +27,8 @@ fn(export("k1_platform_mem_reserve")) mem-reserve(min-size: size): ptr {
   else ptr/null
 }
 
-fn(export("k1_platform_mem_commit")) mem-commit(base: ptr, len: size) {let _ = base; let _ = len;}
-fn(export("k1_platform_io_write")) io-write(file-no: i32, data: ptr, count: size): i64 {
+fn(export("os_platform_mem_commit")) mem-commit(base: ptr, len: size) {let _ = base; let _ = len;}
+fn(export("os_platform_io_write")) io-write(file-no: i32, data: ptr, count: size): i64 {
   let _ = file-no
   let bytes = span/wrap-raw[u8](data, count)
   for b in bytes {
@@ -35,23 +36,63 @@ fn(export("k1_platform_io_write")) io-write(file-no: i32, data: ptr, count: size
   }
   count
 }
-fn(export("k1_platform_io_is_tty")) io-is-tty(file-no: i32): i32 { let _ = file-no; 1 }
-fn(export("k1_platform_process_exit")) process-exit(code: i32) {
+fn(export("os_platform_io_is_tty")) io-is-tty(file-no: i32): i32 { let _ = file-no; 1 }
+fn(export("os_platform_process_exit")) process-exit(code: i32) {
   let _ = code
   shutdown()
   loop {}
 }
 
-fn(export("k1_platform_tmp_arena_size")) tmp_arena_size(): u64 {
-  10000000
+
+fn draw-stuff(c: char, offset: int): empty {
+  draw-glyph(500 + offset * 50, 500, c.as-u8(), 0xFF00FF, 0, 5)
+}
+
+
+fn memcmp-test() {
+  let short = "abc"
+  let word = "hello world!"
+  let block = "twenty bytes exactly"
+  let long = "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789"
+  let short2 = "${short}"
+  let word2 = "${word}"
+  let block2 = "${block}"
+  let long2 = "${long}"
+  let long-diff = "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789X"
+  println("memcmp-test start")
+  println("short eq=${short == short2} ne=${short == "abd"}")
+  println("word eq=${word == word2} ne=${word == "hello world?"}")
+  println("block eq=${block == block2} ne=${block == "twenty bytes exactlY"}")
+  println("long eq=${long == long2} ne=${long == long-diff}")
+  println("memcmp-test end")
 }
 
 fn(export("kernel_main")) kernel-main(): never {
+  let my-arena = core/arena/init(16 * core/arena/mb)
+  mem/set-tmp-arena(my-arena)
+
   console-init()
   let interp = "yo"
   println("Hello from k1!! $interp")
+  memcmp-test()
+  mem-stats()
   fw-config-init()
   ramfb-init()
   fill-rect(0, 0, 740, 480, 0x1010FF)
+
+  draw-stuff('H', 0)
+  draw-stuff('e', 1)
+  draw-stuff('l', 2)
+  draw-stuff('l', 3)
+  draw-stuff('o', 4)
+  draw-stuff(' ', 5)
+  draw-stuff('W', 6)
+  draw-stuff('o', 7)
+  draw-stuff('r', 8)
+  draw-stuff('l', 9)
+  draw-stuff('d', 10)
+  draw-stuff('!', 11)
+
+
   loop {}
 }

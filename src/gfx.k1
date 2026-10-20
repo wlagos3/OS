@@ -1,11 +1,20 @@
 
 
-let(extern("font8x16")) font-data: u8
-let(extern("ramfb_fb")) fb-start: u32
+let(mutable, extern("ramfb_fb")) fb: array[array[u32, 1920], 1080]
 
 
-fn fb(): *mut array[array[u32, 1920], 1080] {
-  (&fb-start).as[ptr].ref-at[array[array[u32, 1920], 1080]](0)
+fn draw-glyph(x: int, y: int, c: u8, fg: u32, bg: u32, scale: int ): empty {
+  let base = c.widen[int] * 16
+  for r in 0.until(16){
+    let row = FONT.[base + r]
+    let mask: u8 = 0b1000_0000
+    for bx in 0.until(8){
+      if row.bit-and(mask) != 0
+        fill-rect(x + bx * scale, y + r * scale, scale, scale, fg )
+      else fill-rect(x + bx * scale, y + r * scale, scale, scale, bg )
+      mask = mask.shift-right(1)
+    }
+  }
 }
 
 
@@ -17,7 +26,7 @@ fn fill-rect(x: int, y: int, w: int, h: int, color: u32): empty {
 
   for row in y0.until(y1) {
     for col in x0.until(x1) {
-      fb().[row].[col] = color
+      fb.[row].[col] = color
     }
   }
 }

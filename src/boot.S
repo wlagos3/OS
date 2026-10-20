@@ -28,6 +28,24 @@ proceed:
     orr x1, x1, #(0x3 << 20)
     msr cpacr_el1, x1
     isb
+    // set up mmu
+    bl mmu_build_table
+    mov x1, #0xFF00
+    msr mair_el1, x1
+    ldr x1, =0x200803519
+    msr tcr_el1, x1
+    ldr x1, =_l1_table
+    msr ttbr0_el1, x1
+    tlbi vmalle1
+    dsb sy
+    isb
+    mrs x1, sctlr_el1
+    orr x1, x1, #(1 << 0)      // M: translation
+    orr x1, x1, #(1 << 2)      // C: data cache
+    orr x1, x1, #(1 << 12)     // I: instruction cache
+    msr sctlr_el1, x1
+    isb
+
     bl kernel_main
     b core_hang
 

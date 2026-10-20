@@ -1,4 +1,4 @@
-# aarch64 bare-metal kernel: k1 (src/*.k1 directory module, root src/module.k1) + C drivers + boot.S
+# aarch64 bare-metal kernel: k1 (src/*.k1 directory module, root src/build.k1) + C drivers + boot.S
 # usage: just / just run / just run-serial / just debug / just clean
 
 out    := "out"
@@ -13,16 +13,15 @@ build:
     set -euo pipefail
     mkdir -p {{out}}
 
-    # --- k1: emit IR in bare no-std mode, then recompile it for our exact
-    # target (ELF, strict alignment; FP/SIMD stays enabled - boot.S turns on the FPU)
-    rm -f src/.k1-out/src.ll
-    k1 --no-std --target arm64-bare --emit-llvm build src || true
-    test -f src/.k1-out/src.ll || { echo "k1 compile failed"; exit 1; }
-    clang --target=aarch64-none-elf -ffreestanding -mstrict-align \
-        -Wno-override-module -g -c src/.k1-out/src.ll -o {{out}}/kernel_k1.o
+    # --- k1: bare target emits exactly one object (everything non-exported is
+    # internal). It is built for generic aarch64 + NEON without strict
+    # alignment, so it needs the MMU on (RAM as Normal memory) to run.
+    rm -f src/.k1-out/src.o
+    k1 --optimize --no-std --target arm64-bare build src
+    test -f src/.k1-out/src.o || { echo "k1 compile failed"; exit 1; }
 
     # --- C and assembly
-    objs=({{out}}/kernel_k1.o)
+    objs=(src/.k1-out/src.o)
     echo '[' > {{out}}/compile_commands.json
     for f in src/boot.S src/*.c src/drivers/*.c src/drivers/virtual/*.c src/lib/*.c; do
         o={{out}}/$(echo "${f#src/}" | tr '/' '_').o

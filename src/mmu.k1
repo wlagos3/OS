@@ -1,0 +1,15 @@
+
+
+let(mutable, extern("_l1_table")) l1-table: array[u64, 512]
+
+let VALID: u64 = 1
+let AF: u64 = (1: u64).shift-left(10)
+let INNER-SHARED: u64 = (3: u64).shift-left(8)
+let ATTR-DEVICE: u64 = (0: u64).shift-left(2)
+let ATTR-NORMAL: u64 = (1: u64).shift-left(2)
+
+
+fn(export("mmu_build_table")) build-table() {
+  l1-table.[0] = ATTR-DEVICE.bit-or(AF).bit-or(VALID)
+  l1-table.[1] = (0x40000000: u64).bit-or(ATTR-NORMAL).bit-or(INNER-SHARED).bit-or(AF).bit-or(VALID)
+}
