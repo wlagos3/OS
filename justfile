@@ -23,7 +23,7 @@ build:
     # --- C and assembly
     objs=(src/.k1-out/src.o)
     echo '[' > {{out}}/compile_commands.json
-    for f in src/boot.S src/*.c src/drivers/*.c src/drivers/virtual/*.c src/lib/*.c; do
+    for f in src/*.S src/*.c src/drivers/*.c src/drivers/virtual/*.c src/lib/*.c; do
         o={{out}}/$(echo "${f#src/}" | tr '/' '_').o
         clang {{cflags}} -c "$f" -o "$o"
         printf '{"directory":"%s","file":"%s","command":"clang %s -c %s -o %s"},\n' \

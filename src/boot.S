@@ -46,6 +46,14 @@ proceed:
     msr sctlr_el1, x1
     isb
 
+    //setup exception vectors
+    ldr x1, =vectors
+    msr vbar_el1, x1
+    isb
+
+
+
+
     bl kernel_main
     b core_hang
 

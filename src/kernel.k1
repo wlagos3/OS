@@ -48,6 +48,15 @@ fn draw-stuff(c: char, offset: int): empty {
   draw-glyph(500 + offset * 50, 500, c.as-u8(), 0xFF00FF, 0, 5)
 }
 
+fn write-string-in-middle-of-screen-for-fun(s: string): empty {
+  let offset = 0
+  for c in s.span() {
+    draw-stuff(c, offset)
+    offset = offset + 1
+
+  }
+}
+
 
 fn memcmp-test() {
   let short = "abc"
@@ -78,20 +87,17 @@ fn(export("kernel_main")) kernel-main(): never {
   mem-stats()
   fw-config-init()
   ramfb-init()
+
+
+
   fill-rect(0, 0, 740, 480, 0x1010FF)
 
-  draw-stuff('H', 0)
-  draw-stuff('e', 1)
-  draw-stuff('l', 2)
-  draw-stuff('l', 3)
-  draw-stuff('o', 4)
-  draw-stuff(' ', 5)
-  draw-stuff('W', 6)
-  draw-stuff('o', 7)
-  draw-stuff('r', 8)
-  draw-stuff('l', 9)
-  draw-stuff('d', 10)
-  draw-stuff('!', 11)
+  write-string-in-middle-of-screen-for-fun("Hello World! :)")
+
+
+
+  let bad = (0x90000000: u64).to-ptr().ref[u64]
+  println("value: ${bad.*}")
 
 
   loop {}
