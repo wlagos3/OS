@@ -97,10 +97,10 @@ fn(export("kernel_main")) kernel-main(): never {
 
   //lets go
 
-  let boot-thread: threads/thread = .{name = "boot", state = :running, ctx = array/zeroed[u64, 13](), entry = fn. {}}
+  let boot-thread: threads/thread = .{name = "boot", state = :running, ctx = .0, entry = fn. {}}
 
   let boot-thread: *threads/thread = mem/current-arena().alloc-t[threads/thread]()
-  boot-thread.* = .{name = "boot", state = :ready, ctx = array/zeroed[u64, 13](), entry = fn. {}}
+  boot-thread.* = .{name = "boot", state = :ready, ctx = .0, entry = fn. {}}
 
   threads/threads.push(boot-thread)
 

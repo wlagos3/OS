@@ -2,14 +2,16 @@ ns threads {
   let(mutable) threads: list[*thread] = list/empty()
   let(mutable) current-thread: int = 0
 
-  fn(extern("context_switch")) context-switch(a-ctx: *array[u64,13], b-ctx: *array[u64, 13])
+  fn(extern("context_switch")) context-switch(a-ctx: *ctx, b-ctx: *ctx)
+
+  type ctx = {x19: u64, x20: u64, x21: u64, x22: u64, x23: u64, x24: u64, x25: u64, x26: u64, x27: u64, x28: u64, x29: u64, x30: u64, sp: u64}
 
   type thread-state = either {ready, running, blocked, dead}
 
   type thread = {
     name: string,
     state: thread-state,
-    ctx: array[u64, 13],
+    ctx: ctx,
     entry: *fn() -> empty
   }
 
@@ -53,10 +55,10 @@ ns threads {
 
   fn spawn(name: string, body: *fn() -> empty): int {
     let t: *thread = mem/current-arena().alloc-t[thread]()
-    t.* = .{name, state = :ready, entry = body, ctx = array/zeroed[u64, 13]()}
+    t.* = .{name, state = :ready, entry = body, ctx = .0}
     let stack = mem-reserve(16 * 1024).to-size()
-    t.ctx.[12] = (stack + 16 * 1024).unsigned()
-    t.ctx.[11] = start-thread.&.as[ptr].to-uint()
+    t.ctx.sp = (stack + 16 * 1024).unsigned()
+    t.ctx.x30 = start-thread.&.as[ptr].to-uint()
     threads.push(t)
     threads.len() - 1
   }
