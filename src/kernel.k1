@@ -15,16 +15,15 @@ let(mutable) reserve-cursor: size = 0
 fn(export("os_platform_mem_reserve")) mem-reserve(min-size: size): ptr {
   if reserve-cursor == 0 {
     reserve-cursor = kernel-end.&.as[ptr].aligned(4096).to-size()
-    // round up to page size
-    let rounded = (min-size + 4095) & 4095.bit-not()
-    // this is a constant for now, gotta read the device tree eventually
-    if reserve-cursor + rounded > 0x48000000 return ptr/null
-    let base = reserve-cursor
-    reserve-cursor = base + rounded
-    buffer/wrap-raw[u8](base.to-ptr(), rounded).fill(0)
-    base.to-ptr()
   }
-  else ptr/null
+  // round up to page size
+  let rounded = (min-size + 4095) & 4095.bit-not()    // this is a constant for now, gotta read the device tree eventually
+  if reserve-cursor + rounded > 0x48000000 return ptr/null
+  let base = reserve-cursor
+  reserve-cursor = base + rounded
+  
+  buffer/wrap-raw[u8](base.to-ptr(), rounded).fill(0) 
+  base.to-ptr()
 }
 
 fn(export("os_platform_mem_commit")) mem-commit(base: ptr, len: size) {let _ = base; let _ = len;}
@@ -96,9 +95,34 @@ fn(export("kernel_main")) kernel-main(): never {
 
 
 
-  let bad = (0x90000000: u64).to-ptr().ref[u64]
-  println("value: ${bad.*}")
+  //lets go
+
+  let boot-thread: threads/thread = .{name = "boot", state = :running, ctx = array/zeroed[u64, 13](), entry = fn. {}}
+
+  let boot-thread: *threads/thread = mem/current-arena().alloc-t[threads/thread]()
+  boot-thread.* = .{name = "boot", state = :ready, ctx = array/zeroed[u64, 13](), entry = fn. {}}
+
+  threads/threads.push(boot-thread)
 
 
-  loop {}
+  let thread-a = fn. {
+    println("i'm a")
+    threads/yield()
+    println("a again")
+    threads/yield()
+
+  }
+  let thread-b = fn. {
+    println("i'm b")
+    threads/yield()
+    println("b again")
+    threads/yield()
+
+  }
+
+
+  threads/spawn("thread a", thread-a.&)
+  threads/spawn("thread b", thread-b.&)
+
+  loop {threads/yield()}
 }
