@@ -5,6 +5,11 @@ fn(extern("mem_stats")) mem-stats()
 fn(extern("fw_config_init")) fw-config-init()
 fn(extern("ramfb_init")) ramfb-init()
 fn(extern("gfx_fill_rect")) gfx-fill-rect(x: i32, y: i32, w: i32, h: i32, color: u32)
+//interrupt
+fn(extern("irq_enable")) irq-enable()
+fn(extern("irq_disable")) irq_disable()
+fn(extern("irq_save")) irq-save(): u64
+fn(extern("irq_restore")) irq-restore(flags: u64)
 
 let(mutable, extern("_kernel_end")) kernel-end: u8
 let(mutable) reserve-cursor: size = 0
@@ -21,8 +26,8 @@ fn(export("os_platform_mem_reserve")) mem-reserve(min-size: size): ptr {
   if reserve-cursor + rounded > 0x48000000 return ptr/null
   let base = reserve-cursor
   reserve-cursor = base + rounded
-  
-  buffer/wrap-raw[u8](base.to-ptr(), rounded).fill(0) 
+
+  buffer/wrap-raw[u8](base.to-ptr(), rounded).fill(0)
   base.to-ptr()
 }
 
@@ -43,14 +48,14 @@ fn(export("os_platform_process_exit")) process-exit(code: i32) {
 }
 
 
-fn draw-stuff(c: char, offset: int): empty {
-  draw-glyph(500 + offset * 50, 500, c.as-u8(), 0xFF00FF, 0, 5)
+fn draw-stuff(c: char, offset: int, x: int, y: int, color: u32): empty {
+  draw-glyph(x + offset * 50, y, c.as-u8(), color, 0, 5)
 }
 
-fn write-string-in-middle-of-screen-for-fun(s: string): empty {
+fn write-string-in-middle-of-screen-for-fun(s: string, x: int, y: int, color: u32): empty {
   let offset = 0
   for c in s.span() {
-    draw-stuff(c, offset)
+    draw-stuff(c, offset, x, y, color)
     offset = offset + 1
 
   }
@@ -78,6 +83,7 @@ fn memcmp-test() {
 fn(export("kernel_main")) kernel-main(): never {
   let my-arena = core/arena/init(16 * core/arena/mb)
   mem/set-tmp-arena(my-arena)
+  threads/threads = pool/with-capacity[threads/thread](256)
 
   console-init()
   let interp = "yo"
@@ -88,10 +94,19 @@ fn(export("kernel_main")) kernel-main(): never {
   ramfb-init()
 
 
+  //interrupts
+  gic/init()
+  timer-set-ctl(1)
+  time/arm-tick-ms(10)
+  irq-enable()
+
+  
+
+
 
   fill-rect(0, 0, 740, 480, 0x1010FF)
 
-  write-string-in-middle-of-screen-for-fun("Hello World! :)")
+  //write-string-in-middle-of-screen-for-fun("Hello World! :)")
 
 
 
@@ -99,30 +114,51 @@ fn(export("kernel_main")) kernel-main(): never {
 
   let boot-thread: threads/thread = .{name = "boot", state = :running, ctx = .0, entry = fn. {}}
 
-  let boot-thread: *threads/thread = mem/current-arena().alloc-t[threads/thread]()
-  boot-thread.* = .{name = "boot", state = :ready, ctx = .0, entry = fn. {}}
-
-  threads/threads.push(boot-thread)
-
+  threads/current-thread = threads/threads.acquire(boot-thread)
 
   let thread-a = fn. {
-    println("i'm a")
-    threads/yield()
-    println("a again")
-    threads/yield()
+    loop {
+      threads/sleep(3000)
+      println("i'm a")
+      println("a again")
+    }
 
   }
   let thread-b = fn. {
     println("i'm b")
-    threads/yield()
     println("b again")
-    threads/yield()
 
   }
 
 
+
+  let ui-thread = fn. {
+    loop {
+      println("starting to draw")
+      fill-rect(0, 0, 1920, 1080, 0x000000)
+      write-string-in-middle-of-screen-for-fun("Hello World! :)", 500, 350, 0xFF0000)
+      println("done")
+      threads/sleep(1000)
+      println("starting to draw")
+      fill-rect(0, 0, 1920, 1080, 0x000000)
+      write-string-in-middle-of-screen-for-fun("Hello World! :)", 500, 500, 0x00FF00)
+      println("done")
+      threads/sleep(1000)
+      println("starting to draw")
+      fill-rect(0, 0, 1920, 1080, 0x000000)
+      write-string-in-middle-of-screen-for-fun("Hello World! :)", 500, 750, 0x0000FF)
+      println("done")
+      threads/sleep(1000)
+    }
+  }
+
+
+
+
+
   threads/spawn("thread a", thread-a.&)
   threads/spawn("thread b", thread-b.&)
+  threads/spawn("UI", ui-thread.&)
 
-  loop {threads/yield()}
+  loop {}
 }

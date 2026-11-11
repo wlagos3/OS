@@ -34,3 +34,50 @@ context_switch:
   ret
 
 
+
+//timer + freq
+.global read_cntpct
+read_cntpct:
+  mrs x0, cntpct_el0
+  ret
+
+.global read_cntfrq
+read_cntfrq:
+  mrs x0, cntfrq_el0
+  ret
+
+
+//timer-set-tval(ticks:u64)
+.global timer_set_tval
+timer_set_tval:
+  msr cntp_tval_el0, x0
+  ret
+
+//timer-set-ctl(ctl:u64)
+.global timer_set_ctl
+timer_set_ctl:
+  msr cntp_ctl_el0, x0
+  ret
+
+
+.global irq_enable
+irq_enable:
+  msr daifclr, #2
+  ret
+
+
+.global irq_disable
+irq_disable:
+  msr daifset, #2
+  ret
+
+.global irq_save
+irq_save:
+    mrs x0, daif
+    msr daifset, #2
+    ret
+
+.global irq_restore
+irq_restore:
+    msr daif, x0
+    ret

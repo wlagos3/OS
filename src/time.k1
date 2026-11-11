@@ -1,0 +1,15 @@
+fn(extern("read_cntpct")) read-cntpct(): u64
+fn(extern("read_cntfrq")) read-cntfrq(): u64
+
+fn(extern("timer_set_tval")) timer-set-tval(ticks: u64)
+fn(extern("timer_set_ctl")) timer-set-ctl(ctl: u64)
+
+
+ns time {
+  fn now(): u64 {read-cntpct()}
+  fn ms-to-ticks(ms: u64): u64 {ms * read-cntfrq() / 1000}
+  fn ticks-to-ms(ticks: u64): u64 {ticks * 1000 / read-cntfrq()}
+
+  fn arm-tick(ticks: u32) {timer-set-tval(ticks)}
+  fn arm-tick-ms(ms: u64) {arm-tick(ms-to-ticks(ms).trunc())}
+}

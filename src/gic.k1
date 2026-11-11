@@ -1,0 +1,21 @@
+ns gic {
+  let GICD: u64 = 0x08000000
+  let GICC: u64 = 0x08010000 //one per core
+
+  fn(inline) reg(base: u64, offset: u64): *u32 {(base + offset).to-ptr().ref[u32]}
+  fn(inline) write32(base: u64, offset: u64, value: u32) { mem/store-volatile(reg(base, offset), value)}
+  fn(inline) read32(base: u64, offset: u64): u32 { mem/load-volatile(reg(base, offset))}
+
+
+  fn init() {
+    write32(GICD, 0x000, 1) //distributor on
+    write32(GICD, 0x100, (1: u32).shift-left(30)) //enable IRQ 30
+
+    write32(GICD, 0x400 + 28, (0x80: u32).shift-left(16)) //one byte per interrupt
+    write32(GICC, 0x004, 0xFF) // accept every priority
+    write32(GICC, 0x000, 1) // CPU interface on
+  }
+
+  fn ack(): u32 {read32(GICC, 0x00C)} // GICC_IAR: which interrupt (low 10 bits)
+  fn eoi(iar: u32){ write32(GICC, 0x010, iar)} // GICC_EOIR: done; write back the same value
+}

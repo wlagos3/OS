@@ -94,6 +94,9 @@ sync_el1:
 
 irq_el1:
   SAVE_REGS
+  mrs x0, esr_el1
+  mrs x1, far_el1
+  mrs x2, elr_el1
   bl exception_irq
   RESTORE_REGS
   eret

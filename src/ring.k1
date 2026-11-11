@@ -1,0 +1,33 @@
+type ring[t, n: static size] = {items: array[t, n], head: u32, tail: u32}
+ns for ring {
+  fn(inline) clamp(n: i64, cap: i64): i64 {
+    n & cap - 1
+  }
+  fn cap[t, n](self: *ring[t, n]): size {
+    #static {
+      let cap = core/meta/static-type-to-value[_, n]()
+      assert-equals(clamp(cap, cap), 0)
+      cap
+    }
+  }
+  fn len[t, n](self: *ring[t, n]): size {(self.tail - self.head).as-size()}
+  fn push[t, n](self: *ring[t, n], elem: t): bool {
+    let cap = self.cap()
+    if len(self) == cap return false
+    self.items.[clamp(self.tail.as-size(), cap)] = elem
+    self.tail = self.tail + 1
+    true
+  }
+  fn pop[t, n](self: *ring[t, n]): ?t {
+    if self.head == self.tail return :none
+    let cap = self.cap()
+    let elem = self.items.[clamp(self.head.as-size(), cap)]
+    self.head = self.head + 1
+    :some elem
+  }
+  fn peek[t, n](self: *ring[t, n]): ?t {
+    if self.head == self.tail return :none
+    let cap = self.cap()
+    :some self.items.[clamp(self.head.as-size(), cap)]
+  }
+}

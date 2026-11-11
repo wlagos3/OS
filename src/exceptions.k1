@@ -1,0 +1,23 @@
+fn(export("exception_sync")) exception-sync(esr: u64, far: u64, elr: u64): never {
+  println("KERNEL EXCEPTION:")
+  println("esr: $esr, far: $far, elr: $elr")
+  loop {}
+}
+fn(export("exception_unhandled")) exception-unhandled(esr: u64, far: u64, elr: u64): never {
+  println("KERNEL EXCEPTION:")
+  println("esr: $esr, far: $far, elr: $elr")
+  loop {}
+}
+fn(export("exception_irq")) exception-irq(esr: u64, far: u64, elr: u64) {
+  let interrupt = gic/ack()
+  if interrupt & 0x3FF == 30 {timer-set-tval(read-cntfrq() / 100)}
+  gic/eoi(interrupt)
+  threads/yield()
+  
+}
+
+
+fn panic(msg: string): never {
+  println(msg)
+  loop {}
+}

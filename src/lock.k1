@@ -1,0 +1,12 @@
+macro critical(body: code) {
+  `
+  let flags_ = lock/acquire()
+  defer lock/release(flags_)
+  ($body)
+  `
+}
+
+ns lock{
+  fn acquire(): u64 {irq-save()}
+  fn release(flags: u64) {irq-restore(flags)}
+}

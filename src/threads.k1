@@ -1,10 +1,32 @@
 ns threads {
-  let(mutable) threads: list[*thread] = list/empty()
-  let(mutable) current-thread: int = 0
-
   fn(extern("context_switch")) context-switch(a-ctx: *ctx, b-ctx: *ctx)
 
-  type ctx = {x19: u64, x20: u64, x21: u64, x22: u64, x23: u64, x24: u64, x25: u64, x26: u64, x27: u64, x28: u64, x29: u64, x30: u64, sp: u64}
+  let(mutable) threads: pool[thread] = .0
+  let(mutable) current-thread: pool/handle[thread] = .0
+
+
+  type thread-handle = pool/handle[thread]
+  type sleeping-thread = {handle: thread-handle, until: u64}
+
+  let(mutable) ready-threads: ring[thread-handle, 256] = .0
+  let(mutable) sleepers: fixlist[sleeping-thread, 256] = .0
+
+
+  type ctx = {
+    x19: u64,
+    x20: u64,
+    x21: u64,
+    x22: u64,
+    x23: u64,
+    x24: u64,
+    x25: u64,
+    x26: u64,
+    x27: u64,
+    x28: u64,
+    x29: u64,
+    x30: u64,
+    sp: ptr
+  }
 
   type thread-state = either {ready, running, blocked, dead}
 
@@ -16,35 +38,56 @@ ns threads {
   }
 
 
-  fn yield(): empty {
-    let n = threads.len()
-    let old = threads.[current-thread]
+  fn make-ready(handle: thread-handle) {
+    let thread = threads.get(handle)
+    thread.state = :ready
+    ready-threads.push(handle)
+    .0
+  }
 
+  fn wake-sleepers() {
+    let now = time/now()
 
-    let next = -1
-    for i in 1.until(n + 1) {
-      let candidate = (current-thread + i) % n
-      if threads.[candidate].state is :ready {
-        next = candidate
-        break
+    while sleepers.len() > 0 and sleepers.[0].until <= now {
+      let to-wake: sleeping-thread = sleepers.[0]
+
+      let i = 0
+      while i < sleepers.len() - 1 {
+        sleepers.[i] = sleepers.[i + 1]
+        i = i + 1
       }
+      sleepers.pop()
+
+      if threads.is-live(to-wake.handle) {make-ready(to-wake.handle)}
     }
+  }
 
-    if next == current-thread return
-    if next == -1 panic("no threads to run")
 
-    let new = threads.[next]
-    if old.state is :running {old.state = :ready}
-    new.state = :running
-    current-thread = next
-    println("picked ${new.name}")
-    context-switch(old.ctx.&, new.ctx.&)
 
+  fn yield(): empty {
+    critical({
+      wake-sleepers()
+      let n = threads.len()
+      let old = threads.get(current-thread)
+
+      let next-handle = if ready-threads.pop() is {
+        :some(handle) -> handle,
+        :none -> if old.state is :running {return} else panic("ready queue empty, todo")
+      }
+
+      let next = threads.get(next-handle)
+
+      if old.state is :running {make-ready(current-thread)}
+      next.state = :running
+      current-thread = next-handle
+      context-switch(old.ctx.&, next.ctx.&)
+    })
   }
 
 
   fn start-thread(): never {
-    let t = threads.[current-thread]
+    irq-enable()
+    let t = threads.get(current-thread)
     let entry = t.entry
     entry()
     t.state = :dead
@@ -52,16 +95,37 @@ ns threads {
   }
 
 
+  fn spawn(name: string, entry: *fn() -> empty): int {critical({
+    let thread-handle = threads.acquire(.{name, state = :ready, entry, ctx = .0})
 
-  fn spawn(name: string, body: *fn() -> empty): int {
-    let t: *thread = mem/current-arena().alloc-t[thread]()
-    t.* = .{name, state = :ready, entry = body, ctx = .0}
-    let stack = mem-reserve(16 * 1024).to-size()
-    t.ctx.sp = (stack + 16 * 1024).unsigned()
-    t.ctx.x30 = start-thread.&.as[ptr].to-uint()
-    threads.push(t)
+    let stack = mem-reserve(16 * 1024)
+
+    threads.get(thread-handle).ctx.sp = stack.add-bytes(16 * 1024)
+    threads.get(thread-handle).ctx.x30 = start-thread.&.as[ptr].to-uint()
+
+    ready-threads.push(thread-handle)
     threads.len() - 1
-  }
+  })}
+
+
+  fn sleep(ms: u64): empty {critical({
+    let sleeper: sleeping-thread = .{handle = current-thread, until = (time/now() + time/ms-to-ticks(ms))}
+    sleepers.push(sleeper)
+
+    //sleepers is sorted by wake time
+
+    let i = sleepers.len() - 1
+
+    while i > 0 and sleepers.[i - 1].until > sleeper.until {
+      sleepers.[i] = sleepers.[i - 1]
+      i = i - 1
+    }
+    sleepers.[i] = sleeper
+
+    let current = threads.get(current-thread)
+    current.state = :blocked
+    yield()
+  })}
 
   //temp
 }
